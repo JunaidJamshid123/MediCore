@@ -1,276 +1,376 @@
-# MediCore - Healthcare Backend
+<div align="center">
 
-A secure and scalable healthcare backend built with NestJS, providing comprehensive user management, JWT authentication, role-based access control, and audit logging.
+# 🏥 MediCore
 
-## 🚀 Features
+### Secure Healthcare Management System
 
-- ✅ **JWT Authentication** - Secure token-based authentication
-- 🔐 **User Management** - Complete CRUD operations for users
-- 👥 **Role-Based Access Control** - Multiple user roles (Admin, Doctor, Nurse, Patient, Receptionist)
-- 🔄 **Token Refresh** - Access token refresh mechanism
-- 🔒 **Password Security** - Bcrypt hashing with strong password requirements
-- 📝 **Audit Logging** - Winston-based logging system
-- 🛡️ **Security Headers** - Helmet.js protection
-- ⚡ **Rate Limiting** - Request throttling
-- 📚 **API Documentation** - Interactive Swagger UI
-- 🏥 **Health Check** - Server status monitoring
-- 🗄️ **PostgreSQL** - Robust database with TypeORM
-- 📊 **Database Migrations** - Version-controlled schema management
+[![NestJS](https://img.shields.io/badge/NestJS-10.0-E0234E?logo=nestjs)](https://nestjs.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.1-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-12+-336791?logo=postgresql)](https://www.postgresql.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## 📋 Prerequisites
+*A modern, secure, and scalable healthcare backend built with NestJS*
 
-- **Node.js** (v18 or higher)
-- **PostgreSQL** (v12 or higher)
+[Features](#-features) • [Quick Start](#-quick-start) • [API Documentation](#-api-documentation) • [Tech Stack](#-tech-stack)
+
+</div>
+
+---
+
+## 📋 Overview
+
+**MediCore** is a comprehensive healthcare management system designed with security and scalability at its core. Built using NestJS and PostgreSQL, it provides robust user management, role-based access control, and complete audit logging capabilities for healthcare organizations.
+
+## ✨ Features
+
+### 🔐 Security & Authentication
+- **JWT Authentication** - Secure token-based authentication with refresh tokens
+- **Role-Based Access Control** - Five distinct user roles (Admin, Doctor, Nurse, Patient, Receptionist)
+- **Password Security** - Bcrypt hashing with strong password requirements
+- **Security Headers** - Helmet.js integration for enhanced security
+- **Rate Limiting** - Request throttling to prevent abuse
+
+### 👥 User Management
+- Complete CRUD operations for user management
+- Role-specific field validation
+- Soft delete support with audit trails
+- Email verification system
+- Profile management
+
+### 🏥 Healthcare-Specific Features
+- **Patient Records** - Medical record numbers, blood type, allergies tracking
+- **Professional Fields** - License numbers, specializations, department assignments
+- **Audit Logging** - Comprehensive activity tracking with timestamps
+- **Data Validation** - Strict input validation for healthcare data integrity
+
+### 📊 Technical Features
+- RESTful API architecture
+- TypeORM with PostgreSQL database
+- Database migrations and seeding
+- Winston-based logging system
+- Interactive Swagger documentation
+- CORS configuration
+- Health check endpoint
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js** v18 or higher
+- **PostgreSQL** v12 or higher
 - **npm** or **yarn**
 
-## 🔧 Installation
+### Installation
 
 1. **Clone the repository**
-```bash
-git clone <repository-url>
-cd MediCore
-```
+   ```bash
+   git clone <repository-url>
+   cd MediCore
+   ```
 
 2. **Install dependencies**
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
-3. **Configure environment variables**
-```bash
-# Copy the example env file
-cp .env.example .env
+3. **Configure environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your database credentials and JWT secrets
+   ```
 
-# Edit .env with your configuration
-# Update DB credentials and JWT secrets
-```
+4. **Setup database**
+   ```bash
+   # Create PostgreSQL database
+   createdb Medicare
 
-4. **Create database**
-```bash
-# Create PostgreSQL database
-createdb Medicare
+   # Run migrations
+   npm run migration:run
 
-# Or using psql
-psql -U postgres -c "CREATE DATABASE Medicare;"
-```
+   # Seed initial data (optional)
+   npm run seed
+   ```
 
-5. **Run migrations**
-```bash
-npm run migration:run
-```
+5. **Start the application**
+   ```bash
+   # Development mode
+   npm run start:dev
 
-6. **Seed database (optional)**
-```bash
-npm run seed
-```
+   # Production mode
+   npm run start:prod
+   ```
 
-## 🚀 Running the Application
+The server will start at `http://localhost:3001`
 
-```bash
-# Development mode with watch
-npm run start:dev
-
-# Production mode
-npm run start:prod
-
-# Debug mode
-npm run start:debug
-
-# Build
-npm run build
-```
-
-## 🔑 Default Test Credentials
-
-After running the seed script:
-
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@medicore.com | Admin@123 |
-| Doctor | doctor@medicore.com | Admin@123 |
-| Nurse | nurse@medicore.com | Admin@123 |
-| Patient | patient@medicore.com | Admin@123 |
+---
 
 ## 📚 API Documentation
 
-Once the server is running, access the Swagger documentation at:
+### Interactive Documentation
+
+Access the complete interactive API documentation via Swagger UI:
 
 ```
 http://localhost:3001/api/docs
 ```
 
-### Main Endpoints
+### Available Endpoints
 
-#### Authentication
-- `POST /auth/register` - Register new user
-- `POST /auth/login` - Login user
-- `POST /auth/refresh` - Refresh access token
-- `POST /auth/logout` - Logout user
-- `GET /auth/profile` - Get current user profile
-- `POST /auth/forgot-password` - Request password reset
-- `POST /auth/reset-password` - Reset password
+#### 🔑 Authentication (`/auth`)
 
-#### Users
-- `GET /users` - Get all users
-- `GET /users/:id` - Get user by ID
-- `POST /users` - Create user
-- `PATCH /users/:id` - Update user
-- `DELETE /users/:id` - Delete user
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `POST` | `/auth/login` | User login | ❌ |
+| `POST` | `/auth/logout` | User logout | ✅ |
+| `POST` | `/auth/refresh` | Refresh access token | ❌ |
+| `GET` | `/auth/profile` | Get current user profile | ✅ |
+| `POST` | `/auth/forgot-password` | Request password reset | ❌ |
+| `POST` | `/auth/reset-password` | Reset password with token | ❌ |
 
-#### Health
-- `GET /health` - Health check
+#### 👥 Users (`/users`)
+
+| Method | Endpoint | Description | Auth Required | Role |
+|--------|----------|-------------|---------------|------|
+| `POST` | `/users` | Create new user | ✅ | Admin |
+| `GET` | `/users` | Get all users | ❌ | - |
+| `GET` | `/users/:id` | Get user by ID | ❌ | - |
+| `PATCH` | `/users/:id` | Update user | ❌ | - |
+| `DELETE` | `/users/:id` | Delete user (soft) | ❌ | - |
+
+#### 🏥 Health (`/health`)
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| `GET` | `/health` | Server health check | ❌ |
+
+---
+
+## 🏗️ Project Structure
+
+```
+MediCore/
+├── src/
+│   ├── main.ts                      # Application entry point
+│   ├── app.module.ts                # Root module
+│   │
+│   ├── config/                      # Configuration files
+│   │   ├── app.config.ts           # App configuration
+│   │   ├── database.config.ts      # Database configuration
+│   │   ├── jwt.config.ts           # JWT configuration
+│   │   └── winston.config.ts       # Logging configuration
+│   │
+│   ├── database/
+│   │   ├── migrations/             # Database migrations
+│   │   ├── seeds/                  # Database seeders
+│   │   └── data-source.ts          # TypeORM data source
+│   │
+│   ├── modules/
+│   │   ├── auth/                   # Authentication module
+│   │   │   ├── dto/                # Data transfer objects
+│   │   │   ├── guards/             # Auth guards (JWT, Local)
+│   │   │   ├── strategies/         # Passport strategies
+│   │   │   ├── auth.controller.ts
+│   │   │   ├── auth.service.ts
+│   │   │   └── auth.module.ts
+│   │   │
+│   │   ├── users/                  # Users module
+│   │   │   ├── dto/                # User DTOs
+│   │   │   ├── entities/           # User entity
+│   │   │   ├── users.controller.ts
+│   │   │   ├── users.service.ts
+│   │   │   └── users.module.ts
+│   │   │
+│   │   └── health/                 # Health check module
+│   │
+│   ├── common/                     # Shared resources
+│   │   ├── decorators/             # Custom decorators
+│   │   ├── filters/                # Exception filters
+│   │   ├── guards/                 # Custom guards
+│   │   ├── interceptors/           # Interceptors
+│   │   └── pipes/                  # Validation pipes
+│   │
+│   └── utils/                      # Utility functions
+│
+├── logs/                           # Application logs
+├── .env                            # Environment variables
+├── .env.example                    # Environment template
+└── package.json                    # Dependencies
+```
+
+---
+
+## 🛠️ Tech Stack
+
+### Core Technologies
+
+- **[NestJS](https://nestjs.com/)** - Progressive Node.js framework
+- **[TypeScript](https://www.typescriptlang.org/)** - Type-safe JavaScript
+- **[PostgreSQL](https://www.postgresql.org/)** - Relational database
+- **[TypeORM](https://typeorm.io/)** - TypeScript ORM
+
+### Security & Authentication
+
+- **[JWT](https://jwt.io/)** - JSON Web Tokens
+- **[Passport](http://www.passportjs.org/)** - Authentication middleware
+- **[Bcrypt](https://www.npmjs.com/package/bcrypt)** - Password hashing
+- **[Helmet](https://helmetjs.github.io/)** - Security headers
+
+### Validation & Documentation
+
+- **[Class Validator](https://github.com/typestack/class-validator)** - Validation decorators
+- **[Class Transformer](https://github.com/typestack/class-transformer)** - Object transformation
+- **[Swagger](https://swagger.io/)** - API documentation
+
+### Development Tools
+
+- **[Winston](https://github.com/winstonjs/winston)** - Logging
+- **[ESLint](https://eslint.org/)** - Code linting
+- **[Prettier](https://prettier.io/)** - Code formatting
+
+---
+
+## 📝 Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NODE_ENV` | Environment mode | `development` |
+| `PORT` | Server port | `3001` |
+| `DB_HOST` | Database host | `localhost` |
+| `DB_PORT` | Database port | `5432` |
+| `DB_USERNAME` | Database username | `postgres` |
+| `DB_PASSWORD` | Database password | - |
+| `DB_NAME` | Database name | `medicore` |
+| `JWT_SECRET` | JWT secret key | - |
+| `JWT_EXPIRES_IN` | Access token expiry | `1h` |
+| `JWT_REFRESH_SECRET` | Refresh token secret | - |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token expiry | `7d` |
+| `RATE_LIMIT_TTL` | Rate limit window (seconds) | `60` |
+| `RATE_LIMIT_MAX` | Max requests per window | `100` |
+| `LOG_LEVEL` | Logging level | `debug` |
+
+---
 
 ## 🗄️ Database
+
+### User Roles
+
+MediCore supports five distinct user roles:
+
+- **Admin** - Full system access
+- **Doctor** - Healthcare provider with medical privileges
+- **Nurse** - Healthcare support staff
+- **Patient** - Healthcare recipient
+- **Receptionist** - Administrative staff
 
 ### Migrations
 
 ```bash
-# Generate a new migration
+# Generate migration
 npm run migration:generate -- src/database/migrations/MigrationName
 
 # Run migrations
 npm run migration:run
 
-# Revert last migration
+# Revert migration
 npm run migration:revert
 
 # Show migration status
 npm run migration:show
 ```
 
-### Schema
+---
 
-The application uses the following main entities:
+## 🧪 Development
 
-- **Users** - Stores user information with role-specific fields
-  - Roles: Admin, Doctor, Nurse, Patient, Receptionist
-  - Authentication fields (email, password, refresh token)
-  - Personal info (name, gender, DOB, contact)
-  - Professional fields (license, specialization, department)
-  - Patient fields (MRN, blood type, allergies)
-  - Audit fields (timestamps, soft delete)
-
-## 🛡️ Security Features
-
-- **Helmet.js** - Security headers
-- **Rate Limiting** - 100 requests per 60 seconds
-- **CORS** - Configurable cross-origin resource sharing
-- **Input Validation** - Class-validator with strict DTOs
-- **Password Hashing** - Bcrypt with salt rounds
-- **JWT Tokens** - Access (1h) and refresh (7d) tokens
-- **Whitelist** - Only allowed properties in requests
-
-## 📊 Project Structure
-
-```
-medicore/
-├── src/
-│   ├── main.ts                    # Application entry point
-│   ├── app.module.ts              # Root module
-│   ├── config/                    # Configuration files
-│   │   ├── app.config.ts
-│   │   ├── database.config.ts
-│   │   ├── jwt.config.ts
-│   │   └── winston.config.ts
-│   ├── database/
-│   │   ├── migrations/            # Database migrations
-│   │   ├── seeds/                 # Database seeders
-│   │   └── data-source.ts         # TypeORM data source
-│   ├── modules/
-│   │   ├── auth/                  # Authentication module
-│   │   │   ├── dto/               # Data transfer objects
-│   │   │   ├── guards/            # Auth guards
-│   │   │   ├── strategies/        # Passport strategies
-│   │   │   ├── auth.controller.ts
-│   │   │   ├── auth.service.ts
-│   │   │   └── auth.module.ts
-│   │   ├── users/                 # Users module
-│   │   │   ├── dto/
-│   │   │   ├── entities/
-│   │   │   ├── users.controller.ts
-│   │   │   ├── users.service.ts
-│   │   │   └── users.module.ts
-│   │   └── health/                # Health check module
-│   ├── common/                    # Shared resources
-│   │   ├── decorators/
-│   │   ├── filters/
-│   │   ├── guards/
-│   │   ├── interceptors/
-│   │   └── pipes/
-│   └── utils/                     # Utility functions
-├── logs/                          # Application logs
-├── .env                           # Environment variables
-├── .env.example                   # Example env file
-├── package.json
-└── tsconfig.json
-```
-
-## 🧪 Testing
+### Available Scripts
 
 ```bash
-# Unit tests
-npm run test
+# Development
+npm run start:dev          # Start with watch mode
+npm run start:debug        # Start with debug mode
 
-# E2E tests
-npm run test:e2e
+# Build
+npm run build              # Build for production
 
-# Test coverage
-npm run test:cov
+# Code Quality
+npm run format             # Format code with Prettier
+npm run lint               # Lint code with ESLint
+
+# Database
+npm run migration:run      # Run migrations
+npm run migration:revert   # Revert last migration
+npm run seed               # Seed database
 ```
 
-## 📝 Development Guidelines
+---
 
-- Follow NestJS best practices
-- Use TypeScript strict mode
-- Implement proper error handling
-- Follow HIPAA compliance principles
-- Write comprehensive tests
-- Document all endpoints
-- Use meaningful commit messages
+## 🔒 Security Best Practices
 
-## 🔒 Environment Variables
+- Always use environment variables for sensitive data
+- Never commit `.env` file to version control
+- Use strong JWT secrets in production
+- Enable HTTPS in production environments
+- Regularly update dependencies
+- Follow HIPAA compliance guidelines for healthcare data
+- Implement proper backup strategies
+- Use database connection pooling
+- Monitor and log all security events
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| NODE_ENV | Environment | development |
-| PORT | Server port | 3001 |
-| DB_HOST | Database host | localhost |
-| DB_PORT | Database port | 5432 |
-| DB_USERNAME | Database user | postgres |
-| DB_PASSWORD | Database password | - |
-| DB_NAME | Database name | medicore |
-| JWT_SECRET | JWT secret key | - |
-| JWT_EXPIRES_IN | Access token expiry | 1h |
-| JWT_REFRESH_SECRET | Refresh token secret | - |
-| JWT_REFRESH_EXPIRES_IN | Refresh token expiry | 7d |
-| RATE_LIMIT_TTL | Rate limit window (seconds) | 60 |
-| RATE_LIMIT_MAX | Max requests per window | 100 |
-| LOG_LEVEL | Logging level | debug |
+---
 
-## 🚧 Roadmap (Future Phases)
+## 🚧 Roadmap
 
 - [ ] Appointment scheduling module
-- [ ] Electronic Health Records (EHR)
+- [ ] Electronic Health Records (EHR) system
 - [ ] Lab results management
 - [ ] Prescription management
 - [ ] Billing and invoicing
-- [ ] Notifications system
+- [ ] Real-time notifications
 - [ ] File upload for medical documents
-- [ ] Real-time chat support
-- [ ] Analytics dashboard
+- [ ] Advanced analytics dashboard
+- [ ] Multi-language support
+- [ ] Mobile application API
+
+---
 
 ## 📄 License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👥 Contributors
-
-MediCore Team
+---
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
 ---
 
-**Built with ❤️ using NestJS**
+## 👥 Authors
+
+**MediCore Team**
+
+---
+
+## 🙏 Acknowledgments
+
+- Built with ❤️ using [NestJS](https://nestjs.com/)
+- Inspired by modern healthcare IT solutions
+- Following healthcare data security best practices
+
+---
+
+<div align="center">
+
+**[⬆ Back to Top](#-medicore)**
+
+Made with ❤️ for better healthcare management
+
+</div>
