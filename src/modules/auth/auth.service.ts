@@ -1,0 +1,122 @@
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { UsersService } from '../users/users.service';
+import {
+  LoginDto,
+  RefreshTokenDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from './dto';
+import * as bcrypt from 'bcrypt';
+import * as jwt from 'jsonwebtoken';
+import { User } from '../users/entities/user.entity';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  async login(user: User) {
+    const payload = { sub: user.id, email: user.email, role: user.role };
+
+    const accessToken = this.jwtService.sign(payload);
+
+    // Use jsonwebtoken directly for refresh token with different secret
+    const refreshSecret =
+      this.configService.get<string>('jwt.refreshSecret') ||
+      'default-refresh-secret';
+    const refreshExpiresIn =
+      this.configService.get<string>('jwt.refreshExpiresIn') || '7d';
+
+    const refreshToken = jwt.sign(payload, refreshSecret, {
+      expiresIn: refreshExpiresIn,
+    } as jwt.SignOptions);
+
+    // Update last login and store refresh token
+    await this.usersService.updateLastLogin(user.id);
+    await this.usersService.updateRefreshToken(user.id, refreshToken);
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        first_name: user.first_name,
+        last_name: user.last_name,
+      },
+    };
+  }
+
+  async refreshToken(refreshTokenDto: RefreshTokenDto) {
+    try {
+      const refreshSecret =
+        this.configService.get<string>('jwt.refreshSecret') ||
+        'default-refresh-secret';
+
+      const payload: any = jwt.verify(
+        refreshTokenDto.refreshToken,
+        refreshSecret,
+      );
+
+      const user = await this.usersService.findOne(payload.sub);
+
+      if (!user || !user.refresh_token) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      // Verify stored refresh token
+      const isTokenValid = await bcrypt.compare(
+        refreshTokenDto.refreshToken,
+        user.refresh_token,
+      );
+
+      if (!isTokenValid) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      // Generate new tokens
+      const newPayload = { sub: user.id, email: user.email, role: user.role };
+      const accessToken = this.jwtService.sign(newPayload);
+
+      return {
+        access_token: accessToken,
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  async logout(userId: string) {
+    await this.usersService.updateRefreshToken(userId, null);
+    return { message: 'Logged out successfully' };
+  }
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+    const user = await this.usersService.findByEmail(forgotPasswordDto.email);
+
+    if (!user) {
+      // Don't reveal if user exists
+      return {
+        message: 'If the email exists, a password reset link has been sent',
+      };
+    }
+
+    // TODO: Generate reset token and send email
+    // For now, just return a message
+    return {
+      message: 'If the email exists, a password reset link has been sent',
+    };
+  }
+
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    // TODO: Verify token and update password
+    // For now, just return a message
+    return { message: 'Password reset functionality coming soon' };
+  }
+}

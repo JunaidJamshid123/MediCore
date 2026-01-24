@@ -127,4 +127,14 @@ export class UsersService {
   async updateLastLogin(id: string): Promise<void> {
     await this.userRepository.update(id, { last_login_at: new Date() });
   }
+
+  async updateRefreshToken(
+    id: string,
+    refreshToken: string | null,
+  ): Promise<void> {
+    const hashedToken = refreshToken
+      ? await bcrypt.hash(refreshToken, 10)
+      : undefined;
+    await this.userRepository.update(id, { refresh_token: hashedToken });
+  }
 }
