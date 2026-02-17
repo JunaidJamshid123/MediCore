@@ -6,8 +6,11 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
   BeforeInsert,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
+import { Role } from '../../roles/entities/role.entity';
 
 export enum UserRole {
   PATIENT = 'patient',
@@ -43,13 +46,22 @@ export class User {
   @Exclude()
   password: string;
 
+  // Legacy role enum field (kept for backward compatibility during migration)
   @Column({
     type: 'enum',
     enum: UserRole,
     default: UserRole.PATIENT,
-    nullable: false,
+    nullable: true,
   })
   role: UserRole;
+
+  // New role relationship
+  @Column({ type: 'uuid', nullable: true })
+  role_id: string;
+
+  @ManyToOne(() => Role, (role) => role.users, { eager: true })
+  @JoinColumn({ name: 'role_id' })
+  roleEntity: Role;
 
   @Column({
     type: 'enum',

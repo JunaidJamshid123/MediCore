@@ -5,6 +5,10 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { RolesModule } from './modules/roles/roles.module';
+import { PermissionsModule } from './modules/permissions/permissions.module';
+import { SessionsModule } from './modules/sessions/sessions.module';
+import { PatientsModule } from './modules/patients/patients.module';
 import databaseConfig from './config/database.config';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
@@ -52,6 +56,10 @@ import jwtConfig from './config/jwt.config';
     HealthModule,
     UsersModule,
     AuthModule,
+    RolesModule,
+    PermissionsModule,
+    SessionsModule,
+    PatientsModule,
   ],
   controllers: [],
   providers: [],
