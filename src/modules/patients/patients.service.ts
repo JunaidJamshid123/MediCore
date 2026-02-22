@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository, SelectQueryBuilder, DataSource } from 'typeorm';
 import { Patient, PatientStatus } from './entities/patient.entity';
 import { EmergencyContact } from './entities/emergency-contact.entity';
 import { InsuranceInfo } from './entities/insurance-info.entity';
@@ -28,7 +28,6 @@ import { ResponseUtil } from '../../utils/response.util';
 @Injectable()
 export class PatientsService {
   private readonly logger = new Logger(PatientsService.name);
-  private mrnCounter = 0;
 
   constructor(
     @InjectRepository(Patient)
@@ -41,6 +40,7 @@ export class PatientsService {
     private readonly relationshipRepository: Repository<PatientRelationship>,
     @InjectRepository(PatientConsent)
     private readonly consentRepository: Repository<PatientConsent>,
+    private readonly dataSource: DataSource,
   ) {}
 
   // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -51,105 +51,127 @@ export class PatientsService {
     createPatientDto: CreatePatientDto,
     registeredBy?: string,
   ): Promise<Patient> {
-    // Check if user_id is already linked to a patient
-    if (createPatientDto.user_id) {
-      const existingPatient = await this.patientRepository.findOne({
-        where: { user_id: createPatientDto.user_id },
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Check if user_id is already linked to a patient
+      if (createPatientDto.user_id) {
+        const existingPatient = await queryRunner.manager.findOne(Patient, {
+          where: { user_id: createPatientDto.user_id },
+        });
+        if (existingPatient) {
+          throw new ConflictException(
+            'A patient record already exists for this user',
+          );
+        }
+      }
+
+      // Check duplicate by email if provided
+      if (createPatientDto.email) {
+        const existingByEmail = await queryRunner.manager.findOne(Patient, {
+          where: { email: createPatientDto.email },
+        });
+        if (existingByEmail) {
+          throw new ConflictException(
+            'A patient with this email already exists',
+          );
+        }
+      }
+
+      // Generate unique MRN using DB sequence (within transaction to avoid races)
+      const mrn = await this.generateMRN(queryRunner.manager);
+
+      // Handle SSN encryption
+      let ssnEncrypted: string | undefined;
+      let ssnLastFour: string | undefined;
+      if (createPatientDto.ssn) {
+        try {
+          ssnEncrypted = EncryptionUtil.encrypt(createPatientDto.ssn);
+          ssnLastFour = EncryptionUtil.maskExceptLast(createPatientDto.ssn, 4);
+        } catch (error) {
+          this.logger.warn('Encryption not configured, storing SSN hash only');
+          ssnLastFour = EncryptionUtil.maskExceptLast(createPatientDto.ssn, 4);
+        }
+      }
+
+      // Extract nested DTOs
+      const { emergency_contacts, insurance_info, ssn, ...patientData } =
+        createPatientDto;
+
+      // Create patient entity
+      const patient = queryRunner.manager.create(Patient, {
+        ...patientData,
+        medical_record_number: mrn,
+        ssn_encrypted: ssnEncrypted,
+        ssn_last_four: ssnLastFour,
+        registered_by: registeredBy,
       });
-      if (existingPatient) {
-        throw new ConflictException(
-          'A patient record already exists for this user',
+
+      const savedPatient = await queryRunner.manager.save(patient);
+
+      // Save emergency contacts if provided
+      if (emergency_contacts && emergency_contacts.length > 0) {
+        const contacts = emergency_contacts.map((ec) =>
+          queryRunner.manager.create(EmergencyContact, {
+            ...ec,
+            patient_id: savedPatient.id,
+          }),
         );
+        await queryRunner.manager.save(contacts);
       }
-    }
 
-    // Check duplicate by email if provided
-    if (createPatientDto.email) {
-      const existingByEmail = await this.patientRepository.findOne({
-        where: { email: createPatientDto.email },
-      });
-      if (existingByEmail) {
-        throw new ConflictException(
-          'A patient with this email already exists',
+      // Save insurance info if provided
+      if (insurance_info && insurance_info.length > 0) {
+        const insurances = insurance_info.map((ins) =>
+          queryRunner.manager.create(InsuranceInfo, {
+            ...ins,
+            patient_id: savedPatient.id,
+          }),
         );
+        await queryRunner.manager.save(insurances);
       }
-    }
 
-    // Generate unique MRN
-    const mrn = await this.generateMRN();
+      await queryRunner.commitTransaction();
 
-    // Handle SSN encryption
-    let ssnEncrypted: string | undefined;
-    let ssnLastFour: string | undefined;
-    if (createPatientDto.ssn) {
-      try {
-        ssnEncrypted = EncryptionUtil.encrypt(createPatientDto.ssn);
-        ssnLastFour = EncryptionUtil.maskExceptLast(createPatientDto.ssn, 4);
-      } catch (error) {
-        this.logger.warn('Encryption not configured, storing SSN hash only');
-        ssnLastFour = EncryptionUtil.maskExceptLast(createPatientDto.ssn, 4);
-      }
-    }
-
-    // Extract nested DTOs
-    const { emergency_contacts, insurance_info, ssn, ...patientData } =
-      createPatientDto;
-
-    // Create patient entity
-    const patient = this.patientRepository.create({
-      ...patientData,
-      medical_record_number: mrn,
-      ssn_encrypted: ssnEncrypted,
-      ssn_last_four: ssnLastFour,
-      registered_by: registeredBy,
-    });
-
-    const savedPatient = await this.patientRepository.save(patient);
-
-    // Save emergency contacts if provided
-    if (emergency_contacts && emergency_contacts.length > 0) {
-      const contacts = emergency_contacts.map((ec) =>
-        this.emergencyContactRepository.create({
-          ...ec,
-          patient_id: savedPatient.id,
-        }),
+      this.logger.log(
+        `Patient registered: ${savedPatient.medical_record_number} by user ${registeredBy}`,
       );
-      await this.emergencyContactRepository.save(contacts);
+
+      return this.findOne(savedPatient.id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    // Save insurance info if provided
-    if (insurance_info && insurance_info.length > 0) {
-      const insurances = insurance_info.map((ins) =>
-        this.insuranceRepository.create({
-          ...ins,
-          patient_id: savedPatient.id,
-        }),
-      );
-      await this.insuranceRepository.save(insurances);
-    }
-
-    this.logger.log(
-      `Patient registered: ${savedPatient.medical_record_number} by user ${registeredBy}`,
-    );
-
-    return this.findOne(savedPatient.id);
   }
 
   /**
    * Generate unique Medical Record Number: MRN-YYYY-NNNNN
+   * Uses SELECT ... FOR UPDATE to prevent race conditions under concurrent registration.
    */
-  private async generateMRN(): Promise<string> {
+  private async generateMRN(manager?: any): Promise<string> {
+    const repo = manager
+      ? manager.getRepository(Patient)
+      : this.patientRepository;
     const year = new Date().getFullYear();
     const prefix = `MRN-${year}-`;
 
-    // Get the last MRN for this year
-    const lastPatient = await this.patientRepository
+    // Get the last MRN for this year (with lock if inside a transaction)
+    const qb = repo
       .createQueryBuilder('patient')
       .where('patient.medical_record_number LIKE :prefix', {
         prefix: `${prefix}%`,
       })
-      .orderBy('patient.medical_record_number', 'DESC')
-      .getOne();
+      .orderBy('patient.medical_record_number', 'DESC');
+
+    if (manager) {
+      qb.setLock('pessimistic_write');
+    }
+
+    const lastPatient = await qb.getOne();
 
     let nextNumber = 1;
     if (lastPatient) {
@@ -208,46 +230,59 @@ export class PatientsService {
   async update(id: string, updatePatientDto: UpdatePatientDto): Promise<Patient> {
     const patient = await this.findOne(id);
 
-    // Handle SSN update
-    const { emergency_contacts, insurance_info, ssn, ...updateData } =
-      updatePatientDto as any;
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (ssn) {
-      try {
-        (updateData as any).ssn_encrypted = EncryptionUtil.encrypt(ssn);
-        (updateData as any).ssn_last_four = EncryptionUtil.maskExceptLast(ssn, 4);
-      } catch {
-        (updateData as any).ssn_last_four = EncryptionUtil.maskExceptLast(ssn, 4);
+    try {
+      // Handle SSN update
+      const { emergency_contacts, insurance_info, ssn, ...updateData } =
+        updatePatientDto as any;
+
+      if (ssn) {
+        try {
+          (updateData as any).ssn_encrypted = EncryptionUtil.encrypt(ssn);
+          (updateData as any).ssn_last_four = EncryptionUtil.maskExceptLast(ssn, 4);
+        } catch {
+          (updateData as any).ssn_last_four = EncryptionUtil.maskExceptLast(ssn, 4);
+        }
       }
-    }
 
-    Object.assign(patient, updateData);
-    const saved = await this.patientRepository.save(patient);
+      Object.assign(patient, updateData);
+      await queryRunner.manager.save(patient);
 
-    // Update emergency contacts if provided
-    if (emergency_contacts) {
-      await this.emergencyContactRepository.delete({ patient_id: id });
-      if (emergency_contacts.length > 0) {
-        const contacts = emergency_contacts.map((ec: CreateEmergencyContactDto) =>
-          this.emergencyContactRepository.create({ ...ec, patient_id: id }),
-        );
-        await this.emergencyContactRepository.save(contacts);
+      // Update emergency contacts if provided
+      if (emergency_contacts) {
+        await queryRunner.manager.delete(EmergencyContact, { patient_id: id });
+        if (emergency_contacts.length > 0) {
+          const contacts = emergency_contacts.map((ec: CreateEmergencyContactDto) =>
+            queryRunner.manager.create(EmergencyContact, { ...ec, patient_id: id }),
+          );
+          await queryRunner.manager.save(contacts);
+        }
       }
-    }
 
-    // Update insurance info if provided
-    if (insurance_info) {
-      await this.insuranceRepository.delete({ patient_id: id });
-      if (insurance_info.length > 0) {
-        const insurances = insurance_info.map((ins: CreateInsuranceInfoDto) =>
-          this.insuranceRepository.create({ ...ins, patient_id: id }),
-        );
-        await this.insuranceRepository.save(insurances);
+      // Update insurance info if provided
+      if (insurance_info) {
+        await queryRunner.manager.delete(InsuranceInfo, { patient_id: id });
+        if (insurance_info.length > 0) {
+          const insurances = insurance_info.map((ins: CreateInsuranceInfoDto) =>
+            queryRunner.manager.create(InsuranceInfo, { ...ins, patient_id: id }),
+          );
+          await queryRunner.manager.save(insurances);
+        }
       }
-    }
 
-    this.logger.log(`Patient updated: ${patient.medical_record_number}`);
-    return this.findOne(id);
+      await queryRunner.commitTransaction();
+
+      this.logger.log(`Patient updated: ${patient.medical_record_number}`);
+      return this.findOne(id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async remove(id: string): Promise<void> {

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
@@ -8,12 +8,13 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto';
-import * as bcrypt from 'bcrypt';
-import * as jwt from 'jsonwebtoken';
+import { HashUtil } from '../../utils/hash.util';
 import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -25,16 +26,14 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(payload);
 
-    // Use jsonwebtoken directly for refresh token with different secret
-    const refreshSecret =
-      this.configService.get<string>('jwt.refreshSecret') ||
-      'default-refresh-secret';
+    const refreshSecret = this.configService.get<string>('jwt.refreshSecret');
     const refreshExpiresIn =
       this.configService.get<string>('jwt.refreshExpiresIn') || '7d';
 
-    const refreshToken = jwt.sign(payload, refreshSecret, {
-      expiresIn: refreshExpiresIn,
-    } as jwt.SignOptions);
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: refreshSecret,
+      expiresIn: refreshExpiresIn as any,
+    });
 
     // Update last login and store refresh token
     await this.usersService.updateLastLogin(user.id);
@@ -56,12 +55,11 @@ export class AuthService {
   async refreshToken(refreshTokenDto: RefreshTokenDto) {
     try {
       const refreshSecret =
-        this.configService.get<string>('jwt.refreshSecret') ||
-        'default-refresh-secret';
+        this.configService.get<string>('jwt.refreshSecret');
 
-      const payload: any = jwt.verify(
+      const payload: any = this.jwtService.verify(
         refreshTokenDto.refreshToken,
-        refreshSecret,
+        { secret: refreshSecret },
       );
 
       const user = await this.usersService.findOne(payload.sub);
@@ -71,7 +69,7 @@ export class AuthService {
       }
 
       // Verify stored refresh token
-      const isTokenValid = await bcrypt.compare(
+      const isTokenValid = await HashUtil.compare(
         refreshTokenDto.refreshToken,
         user.refresh_token,
       );

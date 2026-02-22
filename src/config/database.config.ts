@@ -6,7 +6,8 @@ export default () => ({
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
     database: process.env.DB_NAME || 'medicore',
-    synchronize: process.env.DB_SYNC === 'true' || false,
-    logging: process.env.DB_LOGGING === 'true' || false,
+    synchronize: process.env.DB_SYNC === 'true',
+    logging: process.env.DB_LOGGING === 'true',
+    poolSize: parseInt(process.env.DB_POOL_SIZE || '20', 10),
   },
 });

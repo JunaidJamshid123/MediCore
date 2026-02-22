@@ -1,3 +1,7 @@
+/**
+ * @deprecated Use NestJS built-in ValidationPipe instead (configured globally in main.ts).
+ * This file is kept for reference only.
+ */
 import {
   PipeTransform,
   Injectable,
@@ -8,7 +12,7 @@ import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 
 @Injectable()
-export class ValidationPipe implements PipeTransform<any> {
+export class CustomValidationPipe implements PipeTransform<any> {
   async transform(value: any, { metatype }: ArgumentMetadata) {
     if (!metatype || !this.toValidate(metatype)) {
       return value;
@@ -18,7 +22,13 @@ export class ValidationPipe implements PipeTransform<any> {
     const errors = await validate(object);
 
     if (errors.length > 0) {
-      throw new BadRequestException('Validation failed');
+      const messages = errors.map((err) =>
+        Object.values(err.constraints || {}).join(', '),
+      );
+      throw new BadRequestException({
+        message: 'Validation failed',
+        errors: messages,
+      });
     }
 
     return value;

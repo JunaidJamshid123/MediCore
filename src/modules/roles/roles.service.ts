@@ -9,6 +9,7 @@ import { Repository, In } from 'typeorm';
 import { Role } from './entities/role.entity';
 import { Permission } from '../permissions/entities/permission.entity';
 import { CreateRoleDto, UpdateRoleDto, AssignPermissionsDto } from './dto';
+import { PermissionMatcher } from '../../common/utils/permission-matcher.util';
 
 @Injectable()
 export class RolesService {
@@ -51,10 +52,6 @@ export class RolesService {
     }
 
     return role;
-  }
-
-  async findOneWithPermissions(id: string): Promise<Role> {
-    return this.findOne(id);
   }
 
   async findByName(name: string): Promise<Role> {
@@ -144,23 +141,7 @@ export class RolesService {
 
   async hasPermission(roleId: string, permissionCode: string): Promise<boolean> {
     const role = await this.findOne(roleId);
-
-    // Check for wildcard permission (*:*)
-    if (role.permissions.some((p) => p.code === '*:*')) {
-      return true;
-    }
-
-    // Check for exact match or resource wildcard
-    const [resource, action] = permissionCode.split(':');
-
-    return role.permissions.some((permission) => {
-      const [permResource, permAction] = permission.code.split(':');
-
-      return (
-        (permResource === resource && permAction === action) ||
-        (permResource === resource && permAction === '*') ||
-        (permResource === '*' && permAction === '*')
-      );
-    });
+    const userPermCodes = role.permissions.map((p) => p.code);
+    return PermissionMatcher.hasPermission(userPermCodes, [permissionCode]);
   }
 }

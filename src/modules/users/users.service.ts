@@ -8,8 +8,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserStatus } from './entities/user.entity';
-import { CreateUserDto, UpdateUserDto, ChangePasswordDto, AssignRoleDto } from './dto';
-import * as bcrypt from 'bcrypt';
+import { CreateUserDto, UpdateUserDto, ChangePasswordDto, AssignRoleDto, SearchUsersDto } from './dto';
+import { HashUtil } from '../../utils/hash.util';
 
 @Injectable()
 export class UsersService {
@@ -29,7 +29,7 @@ export class UsersService {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const hashedPassword = await HashUtil.hash(createUserDto.password);
 
     // Convert allergies array to JSON string if provided
     const allergiesString = createUserDto.allergies
@@ -46,31 +46,63 @@ export class UsersService {
     return await this.userRepository.save(user);
   }
 
-  async findAll(): Promise<User[]> {
-    return await this.userRepository.find({
-      select: [
-        'id',
-        'email',
-        'role',
-        'status',
-        'first_name',
-        'last_name',
-        'gender',
-        'date_of_birth',
-        'profile_picture',
-        'phone',
-        'address',
-        'license_number',
-        'specialization',
-        'department',
-        'employee_id',
-        'medical_record_number',
-        'blood_type',
-        'email_verified',
-        'created_at',
-        'updated_at',
-      ],
-    });
+  async findAll(searchDto?: SearchUsersDto) {
+    const { search, role, status, page = 1, limit = 20 } = searchDto || {};
+
+    const qb = this.userRepository.createQueryBuilder('user');
+
+    if (search) {
+      qb.andWhere(
+        '(user.first_name ILIKE :search OR user.last_name ILIKE :search OR user.email ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    if (role) {
+      qb.andWhere('user.role = :role', { role });
+    }
+
+    if (status) {
+      qb.andWhere('user.status = :status', { status });
+    }
+
+    qb.select([
+      'user.id',
+      'user.email',
+      'user.role',
+      'user.status',
+      'user.first_name',
+      'user.last_name',
+      'user.gender',
+      'user.date_of_birth',
+      'user.profile_picture',
+      'user.phone',
+      'user.address',
+      'user.license_number',
+      'user.specialization',
+      'user.department',
+      'user.employee_id',
+      'user.medical_record_number',
+      'user.blood_type',
+      'user.email_verified',
+      'user.created_at',
+      'user.updated_at',
+    ])
+      .orderBy('user.created_at', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string): Promise<User> {
@@ -135,7 +167,7 @@ export class UsersService {
     refreshToken: string | null,
   ): Promise<void> {
     const hashedToken = refreshToken
-      ? await bcrypt.hash(refreshToken, 10)
+      ? await HashUtil.hash(refreshToken)
       : undefined;
     await this.userRepository.update(id, { refresh_token: hashedToken });
   }
@@ -191,7 +223,7 @@ export class UsersService {
     }
 
     // Verify current password
-    const isValidPassword = await bcrypt.compare(
+    const isValidPassword = await HashUtil.compare(
       changePasswordDto.currentPassword,
       user.password,
     );
@@ -201,9 +233,8 @@ export class UsersService {
     }
 
     // Hash and update new password
-    const hashedPassword = await bcrypt.hash(
+    const hashedPassword = await HashUtil.hash(
       changePasswordDto.newPassword,
-      10,
     );
 
     await this.userRepository.update(userId, {

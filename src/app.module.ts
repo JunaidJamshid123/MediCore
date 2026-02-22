@@ -26,10 +26,10 @@ import jwtConfig from './config/jwt.config';
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: () => [
+      useFactory: (configService: ConfigService) => [
         {
-          ttl: parseInt(process.env.RATE_LIMIT_TTL || '60', 10) * 1000,
-          limit: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+          ttl: configService.get<number>('RATE_LIMIT_TTL', 60) * 1000,
+          limit: configService.get<number>('RATE_LIMIT_MAX', 100),
         },
       ],
     }),
@@ -50,6 +50,9 @@ import jwtConfig from './config/jwt.config';
         logging: configService.get('database.logging'),
         migrations: [__dirname + '/database/migrations/*{.ts,.js}'],
         migrationsRun: false,
+        extra: {
+          max: configService.get<number>('database.poolSize', 20),
+        },
       }),
     }),
 

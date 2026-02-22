@@ -26,7 +26,7 @@ export class Role {
   is_system_role: boolean; // System roles cannot be deleted
 
   @ManyToMany(() => Permission, (permission) => permission.roles, {
-    eager: true,
+    eager: false,
   })
   @JoinTable({
     name: 'role_permissions',

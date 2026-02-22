@@ -59,7 +59,7 @@ export class User {
   @Column({ type: 'uuid', nullable: true })
   role_id: string;
 
-  @ManyToOne(() => Role, (role) => role.users, { eager: true })
+  @ManyToOne(() => Role, (role) => role.users, { eager: false })
   @JoinColumn({ name: 'role_id' })
   roleEntity: Role;
 

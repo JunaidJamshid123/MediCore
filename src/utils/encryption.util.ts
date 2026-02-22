@@ -11,7 +11,7 @@ export class EncryptionUtil {
   private static readonly ENCODING: BufferEncoding = 'hex';
 
   /**
-   * Get the encryption key from environment or generate a deterministic one.
+   * Get the encryption key from environment.
    * In production, ENCRYPTION_KEY must be set via environment variable.
    */
   private static getKey(): Buffer {
@@ -21,8 +21,9 @@ export class EncryptionUtil {
         'ENCRYPTION_KEY environment variable is required for field-level encryption',
       );
     }
-    // Ensure key is 32 bytes (256 bits)
-    return crypto.scryptSync(key, 'medicore-salt', 32);
+    // Use a unique salt derived from the key itself to avoid static salt
+    const salt = crypto.createHash('sha256').update(key).digest('hex').slice(0, 16);
+    return crypto.scryptSync(key, salt, 32);
   }
 
   /**

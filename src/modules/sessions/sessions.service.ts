@@ -1,6 +1,6 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, LessThan, MoreThan } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { randomUUID } from 'crypto';
@@ -62,7 +62,7 @@ export class SessionsService {
         where: {
           session_token: sessionToken,
           is_active: true,
-          expires_at: LessThan(new Date()),
+          expires_at: MoreThan(new Date()),
         },
       });
 

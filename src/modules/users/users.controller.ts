@@ -12,6 +12,7 @@ import {
   ClassSerializerInterceptor,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -21,7 +22,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { CreateUserDto, UpdateUserDto, ChangePasswordDto, AssignRoleDto } from './dto';
+import { CreateUserDto, UpdateUserDto, ChangePasswordDto, AssignRoleDto, SearchUsersDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -30,13 +31,14 @@ import { UserRole } from './entities/user.entity';
 @ApiTags('Users')
 @Controller('users')
 @UseInterceptors(ClassSerializerInterceptor)
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new user (Admin only)' })
   @ApiResponse({ status: 201, description: 'User successfully created' })
@@ -48,14 +50,42 @@ export class UsersController {
     return this.usersService.create(createUserDto);
   }
 
+  // ===== STATIC ROUTES BEFORE PARAM ROUTES =====
+
+  @Get('stats')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get user statistics (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Returns user statistics' })
+  getUserStats() {
+    return this.usersService.getUserStats();
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change password for current user' })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({ status: 401, description: 'Current password is incorrect' })
+  async changePassword(
+    @Request() req: any,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    await this.usersService.changePassword(req.user.id, changePasswordDto);
+    return { message: 'Password changed successfully' };
+  }
+
   @Get()
-  @ApiOperation({ summary: 'Get all users' })
-  @ApiResponse({ status: 200, description: 'Returns all users' })
-  findAll() {
-    return this.usersService.findAll();
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE)
+  @ApiOperation({ summary: 'Get all users (paginated)' })
+  @ApiResponse({ status: 200, description: 'Returns paginated users' })
+  findAll(@Query() searchDto: SearchUsersDto) {
+    return this.usersService.findAll(searchDto);
   }
 
   @Get(':id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE)
   @ApiOperation({ summary: 'Get user by ID' })
   @ApiParam({
     name: 'id',
@@ -69,7 +99,9 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update user' })
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update user (Admin only)' })
   @ApiParam({
     name: 'id',
     description: 'User ID (UUID)',
@@ -83,8 +115,10 @@ export class UsersController {
   }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete user' })
+  @ApiOperation({ summary: 'Delete user (Admin only)' })
   @ApiParam({
     name: 'id',
     description: 'User ID (UUID)',
@@ -99,9 +133,8 @@ export class UsersController {
   // ===== ENHANCED USER MANAGEMENT ENDPOINTS =====
 
   @Patch(':id/activate')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Activate user (Admin only)' })
   @ApiParam({ name: 'id', description: 'User ID (UUID)' })
   @ApiResponse({ status: 200, description: 'User activated successfully' })
@@ -112,9 +145,8 @@ export class UsersController {
   }
 
   @Patch(':id/deactivate')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Deactivate user (Admin only)' })
   @ApiParam({ name: 'id', description: 'User ID (UUID)' })
   @ApiResponse({ status: 200, description: 'User deactivated successfully' })
@@ -125,9 +157,8 @@ export class UsersController {
   }
 
   @Patch(':id/suspend')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Suspend user (Admin only)' })
   @ApiParam({ name: 'id', description: 'User ID (UUID)' })
   @ApiResponse({ status: 200, description: 'User suspended successfully' })
@@ -137,25 +168,9 @@ export class UsersController {
     return this.usersService.suspendUser(id);
   }
 
-  @Post('change-password')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Change password for current user' })
-  @ApiResponse({ status: 200, description: 'Password changed successfully' })
-  @ApiResponse({ status: 401, description: 'Current password is incorrect' })
-  async changePassword(
-    @Request() req: any,
-    @Body() changePasswordDto: ChangePasswordDto,
-  ) {
-    await this.usersService.changePassword(req.user.id, changePasswordDto);
-    return { message: 'Password changed successfully' };
-  }
-
   @Post(':id/assign-role')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Assign role to user (Admin only)' })
   @ApiParam({ name: 'id', description: 'User ID (UUID)' })
   @ApiResponse({ status: 200, description: 'Role assigned successfully' })
@@ -165,16 +180,6 @@ export class UsersController {
     @Body() assignRoleDto: AssignRoleDto,
   ) {
     return this.usersService.assignRole(id, assignRoleDto);
-  }
-
-  @Get('stats')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get user statistics (Admin only)' })
-  @ApiResponse({ status: 200, description: 'Returns user statistics' })
-  getUserStats() {
-    return this.usersService.getUserStats();
   }
 }
 
